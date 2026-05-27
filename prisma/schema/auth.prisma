@@ -4,6 +4,7 @@ model User {
   email              String
   image              String?
   role               UserRole   @default(USER)
+  googleId           String?
   status             UserStatus
   deletedAt          DateTime   @default(now())
   needPasswordChange Boolean

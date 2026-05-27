@@ -37,6 +37,7 @@ const envSchema = z.object({
   GROQ_API_KEY: z.string(),
   GROQ_MODEL: z.string(),
   FORM_EMAIL: z.string().email(),
+  GOOGLE_REDIRECT_URI: z.string(),
 });
 
 const parsed = envSchema.safeParse(process.env);

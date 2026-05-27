@@ -21,14 +21,15 @@ import { generateReport } from "../../utils/analysis"
 const parseResumeService = async (
   fileBuffer: Buffer
 ): Promise<string> => {
-
-  const text = await pdfToText(fileBuffer)
-
+try {
+    const text = await pdfToText(fileBuffer)
   if (!text || text.length < 100) {
     throw new Error("Invalid resume content")
   }
-
   return text.replace(/\s+/g, " ").trim()
+} catch (error) {
+  throw new AppError("Failed to Parse Resume",400)
+}
 }
 
 

@@ -61,6 +61,7 @@ const result = await blogServices.getAllBlogs({
 
 const getBlogById = asyncHandler(async (req: Request, res: Response) => {
   const { blogId } = req.params;
+console.log(blogId);
 
   const result = await blogServices.getBlogById(blogId);
 

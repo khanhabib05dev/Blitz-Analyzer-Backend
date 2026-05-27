@@ -8,6 +8,9 @@ import { envConfig } from "../../config/env";
 import status from "http-status"
 import { AppError } from "../../utils/AppError";
 import { auth } from "../../lib/auth";
+import { getGoogleAuthUrl } from "../../utils/google";
+import { getRequestContext } from "../../utils/deviceInfo";
+import { log } from "handlebars/runtime";
 const isProduction = envConfig.NODE_ENV === "production";
 
 // -------------------- REGISTER --------------------
@@ -256,17 +259,59 @@ const googleLoginSuccess = asyncHandler(async (req: Request, res: Response) => {
 
   const result = await authServices.googleLoginSuccess(session);
 
-  const { accessToken, refreshToken } = result;
+  const { accessToken, refreshToken,sessionToken:token } = result;
 
   tokenUtils.setAccessTokenCookie(res, accessToken);
   tokenUtils.setRefreshTokenCookie(res, refreshToken);
+
   // ?redirect=//profile -> /profile
   const isValidRedirectPath = redirectPath.startsWith("/") && !redirectPath.startsWith("//");
   // const finalRedirectPath = isValidRedirectPath ? redirectPath : "/dashboard";
 console.log(redirectPath);
 
   res.redirect(`${envConfig.CLIENT_URL}${redirectPath}`);
-})
+});
+
+
+// ---------------- GOOGLE OAUTH ----------------
+const googleRedirect = asyncHandler(async (_req: Request, res: Response) => {
+  const url = getGoogleAuthUrl();
+  console.log("main url",url);
+  
+  res.json({
+    url:url
+  })
+});
+
+const googleCallback = asyncHandler(async (req: Request, res: Response) => {
+
+  const code = req.query.code as string | undefined;
+  console.log("code",code);
+  
+  if (!code) {
+    console.log(code);
+    res.redirect(`${envConfig.CLIENT_URL}/login?error=oauth_missing_code`);
+    return;
+  }
+  try {
+    const ctx = getRequestContext(req);
+    const result = await authServices.googleOAuthCallback(code, ctx);
+    console.log(result);
+    
+    tokenUtils.setAccessTokenCookie(res, result.accessToken);
+    tokenUtils.setRefreshTokenCookie(res, result.refreshToken);
+      tokenUtils.setBetterAuthSessionCookie(res, result?.sessionToken)
+    res.redirect(`${envConfig.CLIENT_URL}/dashboard`);
+  } catch (err) {
+    const msg = err instanceof Error ? encodeURIComponent(err.message) : "oauth_failed";
+    console.log(err);
+    
+    res.redirect(`${envConfig.CLIENT_URL}/login?error=${msg}`);
+  }
+});
+
+
+
 
 const handleOAuthError = asyncHandler(async (req: Request, res: Response) => {
   const error = req.query.error as string || "oauth_failed";
@@ -285,5 +330,7 @@ export const authControllers = {
   resendOtp,
   googleLoginSuccess,
   handleOAuthError,
-  googleLogin
+  googleLogin,
+  googleRedirect,
+  googleCallback
 };

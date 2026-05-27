@@ -21,6 +21,7 @@ import { PROFILE_CACHE_EXPIRE, REFRESH_EXPIRE, SESSION_EXPIRE } from "../../conf
 import { emailQueue } from "../../queue/emailQueue";
 import { getExpiry, hashOTP } from "../../utils/email.utils";
 import { Prisma } from "../../generated/prisma/client";
+import { exchangeCodeForProfile } from "../../utils/google";
 
 
 
@@ -149,6 +150,8 @@ const loginUser = async (payload: ILoginUserPayload) => {
 
   if (data.user.status === UserStatus.BANNED)
     throw new AppError("User is blocked", status.FORBIDDEN);
+  if (data.user.googleId)
+    throw new AppError("Login with google", status.FORBIDDEN);
 
   if (data.user.isDeleted || data.user.status === UserStatus.DELETED)
     throw new AppError("User is deleted", status.NOT_FOUND);
@@ -667,8 +670,108 @@ const googleLoginSuccess = async (
   return { accessToken, refreshToken, sessionToken };
 };
 
+const issueTokensAndSession = async (
+  userId: string,
+  role: string,
+  ctx: any
+): Promise<any> => {
+  // Generate refresh token/session first (need sessionId inside refresh payload)
+  // const sessionId = generateJti();
+  // const refreshJti = generateJti();
+  // const { token: refreshToken, expiresAt } = createRefreshToken({
+  //   userId,
+  //   sessionId,
+  //   jti: refreshJti,
+  // });
+}
 
-export const authServices = {
+
+// ---------------- GOOGLE OAUTH ----------------
+const googleOAuthCallback = async (code: string, ctx: any) => {
+  const profile = await exchangeCodeForProfile(code);
+
+  const isUser = await prisma.user.findUnique({
+    where:{email:profile.email}
+  });
+
+  const isEmailAccount = await prisma.account.findFirst({
+    where:{userId:isUser?.id!}
+  })
+  
+
+  if(isUser?.googleId === "" &&  isEmailAccount?.password?.length){
+    throw new AppError("account already exist with this email. use email & password ")
+  }
+
+  if(isUser){
+    const {user,token} = await auth.api.signInEmail({
+      body:{
+        email:profile.email,
+        password:"Googledsffsdafs#@dfw254235423"
+      }
+    });
+
+      if (user.status === UserStatus.BANNED) throw new AppError("Account banned", 403);
+
+
+ const tokenPayload = {
+    userId: user.id,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+  };
+
+  const accessToken = tokenUtils.getAccessToken(tokenPayload);
+  const refreshToken = tokenUtils.getRefreshToken(tokenPayload);
+    const sessionToken = token
+return {accessToken,refreshToken,sessionToken}
+
+  }else{
+    const { user } = await auth.api.signUpEmail({
+      body: {
+        email: profile.email,
+        name: profile.name,
+        googleId:profile.googleId,
+        password: "Googledsffsdafs#@dfw254235423",
+        role:UserRole.USER
+      }
+    });
+    
+
+    // 2️⃣ Create profile (DB only)
+    await prisma.customerProfile.create({
+      data: {
+        email: user.email,
+        name: user.name,
+        userId: user.id
+      }
+    });
+
+  if (user.status === UserStatus.BANNED) throw new AppError("Account banned", 403);
+
+   const {user:data,token} = await auth.api.signInEmail({
+      body:{
+        email:profile.email,
+        password:"Googledsffsdafs#@dfw254235423"
+      }
+    });
+
+ const tokenPayload = {
+    userId: user.id,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+  };
+
+  const accessToken = tokenUtils.getAccessToken(tokenPayload);
+  const refreshToken = tokenUtils.getRefreshToken(tokenPayload);
+    const sessionToken = token
+return {accessToken,refreshToken,sessionToken}
+  }
+};
+
+
+export  const authServices = {
   registerUser,
   loginUser,
   getAllNewTokens,
@@ -681,5 +784,6 @@ export const authServices = {
   changeAvatar,
   updateProfile,
   resendOtp,registerManager,
-  googleLoginSuccess
+  googleLoginSuccess,
+  googleOAuthCallback
 };

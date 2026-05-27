@@ -158,21 +158,19 @@ const getBlogById = async (blogId: string) => {
   const cacheKey = buildSingleCacheKey(blogId);
 
   const cached = await redis.get(cacheKey);
+  console.log(cached);
+  
   if (cached) return JSON.parse(cached);
 
   const blog = await prisma.blog.findUnique({
     where: { id: blogId },
     include: {
       author: true,
-      comments: {
-        include: {
-          author: true,
-          replies: true,
-        },
-      },
+      
     },
   });
 
+  
   if (!blog) throw new AppError("Blog not found", 404);
 
   await redis.set(cacheKey, JSON.stringify(blog), "EX", CACHE_TTL);

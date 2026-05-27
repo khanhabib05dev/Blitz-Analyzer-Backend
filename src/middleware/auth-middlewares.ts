@@ -33,10 +33,7 @@ export async function authMiddleware(
         include:{customerProfile:true,admin:true,manager:true}
       } }
     });
-    // console.log("session data",sessionData);
-    // console.log("token",token);
-    
-
+ 
     if (!sessionData || !sessionData.user) {
       return sendError(res, {
         message: "Unauthorized: Invalid or expired session",
@@ -46,7 +43,7 @@ export async function authMiddleware(
 
     const { user } = sessionData;
 
-console.log(user);
+
 
     if (user.status === "BANNED" || user.status === "DELETED" || user.isDeleted) {
       return sendError(res, {

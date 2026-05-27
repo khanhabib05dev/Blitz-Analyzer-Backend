@@ -29,6 +29,4 @@ indexRouter.use("/generative-ai",aiRoutes)
 indexRouter.use("/blog",blogRoutes)
 indexRouter.use("/issue",issueRouter)
 
-
-
 export default indexRouter
